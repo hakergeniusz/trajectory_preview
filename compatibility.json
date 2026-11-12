@@ -1,0 +1,17 @@
+{
+  "horizon_revision": "2ebf00a0281c592f79191e76fce0e7d522c6f425",
+  "source_sha256": {
+    "crates/horizon-client/src/game.rs": "b12f409bf298f8d7f40f2e79e7e39d5fe7ebe464ecbbeac6914d7814d114de23",
+    "crates/horizon-client/src/game/creatures.rs": "e5addffe79b5d814627f9a303fd3e55535772033ee8f4a6390273bb42d5ff3ef",
+    "crates/horizon-client/src/game/item_use.rs": "0ed6f308b30d45ff032d6301938686a26b53efd7b1d958c0596d2cc80cc0b8ab",
+    "crates/horizon-client/src/game/native_hooks.rs": "2cb9c8f04dd92484ae22788c61d658a76b34ab74bf9deab06b0e44958eecd5bd",
+    "crates/horizon-client/src/game/native_visuals.rs": "9fc577a0cbe440843be554962628d036c5812bcbf53286ab35344513306592b7",
+    "crates/horizon-client/src/arrows.rs": "e8ebea7ee927d56e7608e56e5931ef70c6766dbf88b8dbc876da8f724655c242",
+    "crates/horizon-client/src/gizmos.rs": "55d976fc197ecd2b6802848c920b08df89d3fef1fe5071b9688e9445a182b216",
+    "crates/horizon-client/src/projectiles.rs": "bd19bed867c18d8c772b874d6c9ce429024d58729796e5879def0d02e956cbf1"
+  },
+  "horizon_repository": "https://github.com/horizon-rust/horizon",
+  "horizon_mixins_repository": "https://github.com/horizon-rust/horizon-mixins",
+  "horizon_mixins_revision": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
+  "mixin_schema": 6
+}

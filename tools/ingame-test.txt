@@ -1,0 +1,41 @@
+# Trajectory Preview in-game verification — horizon-ctl script.
+# Acceptance bar:
+#   1. holding a bow (no draw) shows NO line;
+#   2. drawing the bow draws the white trajectory + red impact box, growing
+#      with the draw and hiding under the release threshold (< ~3 ticks);
+#   3. the line bends over distance (gravity) and ENDS at the surface aimed
+#      at; walking closer/farther moves the impact box;
+#   4. hold snowball / ender pearl / splash potion / XP bottle: the line
+#      appears immediately (potions lob with the -20 degree offset);
+#   5. a charged crossbow draws the flat fast arrow line.
+launch --world TrajPreviewTest --seed 1 --wait
+state
+give minecraft:bow 1
+give minecraft:arrow 64
+give minecraft:snowball 16
+give minecraft:ender_pearl 4
+give minecraft:splash_potion 4
+give minecraft:experience_bottle 4
+# stand where a wall is visible ~20 blocks out (adjust per world)
+tp ~ ~8 ~
+screenshot traj-1-bow-undrawn
+# draw the bow: hold use, screenshot at half draw and full draw
+mouse right down
+sleep 1
+screenshot traj-2-bow-half-draw
+sleep 2
+screenshot traj-3-bow-full-draw
+mouse right up
+# throwables preview on hold alone
+select 2
+screenshot traj-4-snowball
+select 3
+screenshot traj-5-pearl
+select 4
+screenshot traj-6-potion
+select 5
+screenshot traj-7-bottle
+# look down a cliff and confirm the line follows the aim
+look 0 60
+sleep 1
+screenshot traj-8-aim-down
