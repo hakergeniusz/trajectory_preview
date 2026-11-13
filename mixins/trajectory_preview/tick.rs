@@ -4,7 +4,7 @@
 fn trajectory_tick(game: &mut crate::game::Game<'_>) {
     use crate::game::trajectory_sim;
     use crate::game::trajectory_state as state;
-    if !game.native_on(state::ID) {
+    if !game.native_on(crate::game::trajectory_preview::ID) {
         return;
     }
     if !game.native_window() {

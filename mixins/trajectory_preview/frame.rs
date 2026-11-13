@@ -8,7 +8,7 @@ fn trajectory_frame(
     lines: &mut Vec<horizon_client::gizmos::Line>,
 ) {
     use crate::game::trajectory_state as state;
-    if !game.native_on(state::ID) {
+    if !game.native_on(crate::game::trajectory_preview::ID) {
         return;
     }
     if let Some(preview) = state::held() {
