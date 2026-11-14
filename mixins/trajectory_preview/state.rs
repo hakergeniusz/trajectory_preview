@@ -12,11 +12,20 @@ pub const LINE_WIDTH: f32 = 2.0;
 pub const MARK_COLOR: u32 = 0xFFFF_3F3F;
 /// The impact marker's half-size, in blocks.
 pub const MARK_SIZE: f64 = 0.15;
+/// The ground track's gray — the flight's shadow on the terrain below it.
+/// Aiming dead-ahead, the arc itself sits exactly on the view axis and
+/// projects to a line under the crosshair; the ground track is what makes
+/// the path readable then.
+pub const GROUND_COLOR: u32 = 0xFF9A_9A9A;
+/// The arc draws every other step: a dashed line reads as the flight it is.
+pub const DASH: usize = 2;
 
-/// One simulated flight: a position per step, and where it lands.
+/// One simulated flight: a position per step, where it lands, and the
+/// flight's shadow on the terrain (one point per few steps).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Preview {
     pub points: Vec<[f64; 3]>,
+    pub ground: Vec<[f64; 3]>,
     pub impact: Option<[f64; 3]>,
 }
 
@@ -79,20 +88,30 @@ pub fn mark(at: [f64; 3]) -> Vec<Line> {
         .collect()
 }
 
-/// The flight's lines: one segment per simulated step, plus the marker.
+/// The flight's lines: the dashed arc (one segment every [`DASH`] steps),
+/// the ground track, and the marker.
 pub fn build_lines(preview: &Preview) -> Vec<Line> {
     let mut lines = Vec::with_capacity(
-        preview
-            .points
-            .len()
-            .saturating_sub(1)
+        (preview.points.len() / DASH)
+            .saturating_add(preview.ground.len().saturating_sub(1))
             .saturating_add(usize::from(preview.impact.is_some()) * 12),
     );
-    for pair in preview.points.windows(2) {
+    for (i, pair) in preview.points.windows(2).enumerate() {
+        if i % DASH != 0 {
+            continue;
+        }
         lines.push(Line {
             start: pair[0],
             end: pair[1],
             color: LINE_COLOR,
+            width: LINE_WIDTH,
+        });
+    }
+    for pair in preview.ground.windows(2) {
+        lines.push(Line {
+            start: pair[0],
+            end: pair[1],
+            color: GROUND_COLOR,
             width: LINE_WIDTH,
         });
     }

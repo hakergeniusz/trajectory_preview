@@ -16,6 +16,9 @@ const MAX_TICKS: u32 = 400;
 const VOID_Y: f64 = -64.0;
 /// The spawn spot every player throw shares: the eye, a tenth of a block down.
 const EYE_DROP: f64 = 0.1;
+/// The ground track samples the terrain under the flight every this many
+/// steps (a straight cast down, [`crate::game::Game::clip_ray`]).
+const GROUND_EVERY: u32 = 4;
 
 /// What the hand holds right now: the kind to fly, its speed and the pitch
 /// offset its throw applies — None hides the preview.
@@ -127,8 +130,9 @@ pub fn preview(game: &mut crate::game::Game<'_>) {
         border: Some(game.border.bounds()),
     };
     let mut points = vec![[start.x, start.y, start.z]];
+    let mut ground = Vec::new();
     let mut impact = None;
-    for _ in 0..MAX_TICKS {
+    for step in 0..MAX_TICKS {
         // Arrows and tridents tick through the arrow path; the thrown kinds
         // through the projectile's own — the dispatch the creatures tick makes.
         let (keep, hit) = if p.arrow.is_some() {
@@ -137,6 +141,17 @@ pub fn preview(game: &mut crate::game::Game<'_>) {
             p.tick(&pw)
         };
         points.push([p.position.x, p.position.y, p.position.z]);
+        // The flight's shadow: every few steps, the ground under the flight
+        // (a straight cast down; open sky adds nothing). Aiming dead-ahead
+        // the arc lies on the view axis and reads as a line on screen —
+        // this track is what shows the path then.
+        if step % GROUND_EVERY == 0 {
+            if let Some(hit) = game
+                .clip_ray([p.position.x, p.position.y, p.position.z], [0.0, -1.0, 0.0], 48.0)
+            {
+                ground.push(hit.point);
+            }
+        }
         match hit {
             Hit::None => {}
             Hit::Block { at, .. } | Hit::Entity { at, .. } => {
@@ -148,5 +163,5 @@ pub fn preview(game: &mut crate::game::Game<'_>) {
             break;
         }
     }
-    state::publish(state::Preview { points, impact });
+    state::publish(state::Preview { points, ground, impact });
 }
