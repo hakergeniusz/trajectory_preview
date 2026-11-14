@@ -3,8 +3,8 @@
 fn trajectory_preview_listed(mods: &mut Vec<crate::game::native_hooks::NativeMod>) {
     mods.push(crate::game::native_hooks::NativeMod {
         id: "trajectory_preview".into(),
-        title: "Trajectory Preview 0.2.1".into(),
-        description: "A dashed flight arc with ground track and tick marks for the aimed projectile — bows, tridents and thrown items.".into(),
+        title: "Trajectory Preview 0.3.0".into(),
+        description: "A dashed flight arc with ground track, plus a side profile panel by the crosshair — distance and drop readable at every aim angle.".into(),
         keys: vec![],
     });
 }

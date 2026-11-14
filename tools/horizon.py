@@ -100,13 +100,15 @@ def mixin_stage(horizon, stages):
     report = json.loads(applied.stdout)
     # The CLI drops a bundle whose targets no longer resolve and still says ok —
     # the gates would then compile against nothing. The runtime module must be in
-    # the staged sources, and all five hook helpers must have landed in native_hooks.rs.
+    # the staged sources, and every hook helper must have landed in its
+    # target's file.
     staged = {str(p): p.read_text(errors="ignore") for p in (output / "crates").rglob("*.rs")}
     for module in ("pub(crate) mod trajectory_preview {", "pub(crate) mod trajectory_state {", "pub(crate) mod trajectory_sim {"):
         if not any(module in text for text in staged.values()):
             raise ValueError(f"the staged sources hold no `{module[:-2]}`: the bundle did not apply")
     for helper, file in (
         ("fn trajectory_tick", "crates/horizon-client/src/game/native_hooks.rs"),
+        ("fn trajectory_hud", "crates/horizon-client/src/game/native_hooks.rs"),
         ("fn trajectory_frame", "crates/horizon-client/src/game/native_visuals.rs"),
     ):
         if helper not in (output / "crates/horizon-client/src" / file.split("src/", 1)[1]).read_text():

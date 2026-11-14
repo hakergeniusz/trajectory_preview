@@ -1,11 +1,12 @@
 [mod]
 id = "trajectory_preview"
-version = "0.2.1"
+version = "0.3.0"
 priority = 100
 
 # The commit it was tested on: the tick hook simulates the held projectile
-# with the game's own ProjWorld/ArrowScene (game/creatures.rs, game.rs) and
-# the frame hook draws into the gizmo lines (game/native_visuals.rs), so a
+# with the game's own ProjWorld/ArrowScene (game/creatures.rs, game.rs), the
+# frame hook draws into the gizmo lines (game/native_visuals.rs) and the hud
+# hook paints the side profile panel (game/native_hooks.rs, hud.rs), so a
 # Horizon change in any of those sources needs a re-check.
 [compatibility]
 horizon_revision = "2ebf00a0281c592f79191e76fce0e7d522c6f425"
@@ -53,6 +54,18 @@ helper = "frame.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
   { name = "lines", ty = "&mut Vec<horizon_client::gizmos::Line>", value = "lines" },
+]
+
+# Every HUD pass: the flight's side profile panel right of the crosshair —
+# length across, drop down, readable at every aim angle.
+[[injection]]
+id = "hud"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_hud"
+helper = "hud.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
 ]
 
 # The row in Options > Mods: the mod and what it does.

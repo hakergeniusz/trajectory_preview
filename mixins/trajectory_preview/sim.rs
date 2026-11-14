@@ -131,28 +131,7 @@ pub fn preview(game: &mut crate::game::Game<'_>) {
     };
     let mut points = vec![[start.x, start.y, start.z]];
     let mut ground = Vec::new();
-    let mut ticks = Vec::new();
     let mut impact = None;
-    // The plumb comb's aim ray: the release direction (the same math
-    // Projectile::shoot_from_rotation runs, offset included), normalized —
-    // a tick every TICK_EVERY blocks of forward travel hangs from the aim
-    // ray down to the flight, so the drop below the crosshair reads even
-    // aiming dead-ahead (the arc itself projects to the view's plane then).
-    let (pr, yr, or) = (
-        game.pitch.to_radians(),
-        game.yaw.to_radians(),
-        (game.pitch + offset).to_radians(),
-    );
-    let aim = {
-        let d = [
-            f64::from(-yr.sin() * pr.cos()),
-            f64::from(-or.sin()),
-            f64::from(yr.cos() * pr.cos()),
-        ];
-        let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt().max(1.0e-9);
-        [d[0] / len, d[1] / len, d[2] / len]
-    };
-    let mut next_tick = state::TICK_EVERY;
     for step in 0..MAX_TICKS {
         // Arrows and tridents tick through the arrow path; the thrown kinds
         // through the projectile's own — the dispatch the creatures tick makes.
@@ -162,27 +141,11 @@ pub fn preview(game: &mut crate::game::Game<'_>) {
             p.tick(&pw)
         };
         points.push([p.position.x, p.position.y, p.position.z]);
-        // The comb: from where the aim ray sits at this forward distance
-        // down to where the flight actually is.
-        let at = [p.position.x, p.position.y, p.position.z];
-        let forward = (at[0] - start.x) * aim[0]
-            + (at[1] - start.y) * aim[1]
-            + (at[2] - start.z) * aim[2];
-        if forward >= next_tick && ticks.len() < state::MAX_TICKS {
-            ticks.push((
-                [
-                    start.x + aim[0] * forward,
-                    start.y + aim[1] * forward,
-                    start.z + aim[2] * forward,
-                ],
-                at,
-            ));
-            next_tick += state::TICK_EVERY;
-        }
         // The flight's shadow: every few steps, the ground under the flight
         // (a straight cast down; open sky adds nothing). Aiming dead-ahead
         // the arc lies on the view axis and reads as a line on screen —
-        // this track is what shows the path then.
+        // the HUD panel's side profile (the runtime's projection) is what
+        // shows the drop there, this track anchors it in the terrain.
         if step % GROUND_EVERY == 0 {
             if let Some(hit) = game
                 .clip_ray([p.position.x, p.position.y, p.position.z], [0.0, -1.0, 0.0], 48.0)
@@ -204,7 +167,6 @@ pub fn preview(game: &mut crate::game::Game<'_>) {
     state::publish(state::Preview {
         points,
         ground,
-        ticks,
         impact,
     });
 }
