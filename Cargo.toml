@@ -1,12 +1,11 @@
 [package]
-name = "horizon-trajectory-preview"
-version = "0.1.0"
+name = "trajectory_preview"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 description = "Draws where the projectile in hand will land, with the game's own physics. A Horizon native mod."
 publish = false
 
-# The runtime doubles as the mod's library (its tests) and the module the
-# bundle injects into the game; the other files compile only inside it.
-[lib]
-path = "mixins/trajectory_preview/runtime.rs"
+[dependencies]
+# The pinned SDK's API crate; the launcher stages its own copy of the same build.
+horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }

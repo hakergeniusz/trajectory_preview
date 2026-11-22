@@ -1,19 +1,25 @@
-// Trajectory Preview's brain: pure standard library, no game types, so it
-// compiles and tests wherever — as this crate's library and, injected, as a
-// module of the game. The policy table says, from the item in hand, what
-// flies and how: the same speed and pitch offset the game's own release
-// paths use (the bow's draw curve, the trident's ten-tick gate, the
-// throwables' 1.5, the potions' -20 degree lob). The simulation itself runs
-// on the game side (`sim.rs`) with the game's own projectile tick; this
-// file only decides whether a shot is live and with which parameters.
-//
-// Clean-room: written for Horizon from the game's own public behavior; it
-// copies nothing from any mod.
-//
-// Copyright (c) 2026 hakergeniusz. MIT.
+//! Trajectory Preview, the native-route native mod: where the projectile in
+//! hand will land, drawn with the game's own physics.
+//!
+//! The brain is pure standard library — no game types — so it compiles and
+//! tests wherever. The policy table says, from the item in hand, what flies
+//! and how: the same speed and pitch offset the game's own release paths
+//! use (the bow's draw curve, the trident's ten-tick gate, the throwables'
+//! 1.5, the potions' -20 degree lob). The simulation itself runs on the
+//! game side (the tick mixin) with the game's own projectile tick against
+//! the live world; the frame mixin joins the flight to the depth-tested
+//! gizmo lines, and the HUD mixin paints the side-profile panel by the
+//! crosshair — a length × height plot that stays readable at every aim
+//! angle (the world-space arc collapses onto the view axis dead-ahead).
+//!
+//! Clean-room: written for Horizon from the game's own public behavior; it
+//! copies nothing from any mod.
+//!
+//! Copyright (c) 2026 hakergeniusz. MIT.
 
-/// The mod's registry id: the Options > Mods row and the injection gates.
-pub const ID: &str = "trajectory_preview";
+use std::sync::Mutex;
+
+use mod_api::{Hooks, RegistrationContext, Registrar};
 
 /// What is in the hand right now and how it is being used.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -105,6 +111,143 @@ pub fn plan(what: What) -> Option<Shot> {
         },
     };
     Some(shot)
+}
+
+// ── The published preview ─────────────────────────────────────────────────
+
+/// A flight is simulated at most this many ticks (twenty seconds).
+pub const MAX_TICKS: u32 = 400;
+/// A flight past this depth stops (the void).
+pub const VOID_Y: f64 = -64.0;
+/// The spawn spot every player throw shares: the eye, a tenth of a block down.
+pub const EYE_DROP: f64 = 0.1;
+/// The ground track samples the terrain under the flight every this many
+/// steps (a straight cast down, the game's own clip_ray).
+pub const GROUND_EVERY: u32 = 4;
+
+/// The flight line: white, two pixels, like a gizmo stroke.
+pub const LINE_COLOR: u32 = 0xFFFF_FFFF;
+pub const LINE_WIDTH: f32 = 2.0;
+/// The impact marker's red, the same width.
+pub const MARK_COLOR: u32 = 0xFFFF_3F3F;
+/// The impact marker's half-size, in blocks.
+pub const MARK_SIZE: f64 = 0.15;
+/// The ground track's gray — the flight's shadow on the terrain below it.
+pub const GROUND_COLOR: u32 = 0xFF6E_6E6E;
+/// The arc draws every other step: a dashed line reads as the flight it is.
+pub const DASH: usize = 2;
+
+/// One simulated flight: a position per step, where it lands, and the
+/// flight's shadow on the terrain (one point per few steps). The drop's
+/// side view lives in the HUD panel (the projection below); the
+/// world-space lines are the depth-anchored view.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Preview {
+    pub points: Vec<[f64; 3]>,
+    pub ground: Vec<[f64; 3]>,
+    pub impact: Option<[f64; 3]>,
+}
+
+static PREVIEW: Mutex<Option<Preview>> = Mutex::new(None);
+
+/// The game tick publishes; a frame reads the latest.
+pub fn publish(preview: Preview) {
+    if let Ok(mut held) = PREVIEW.lock() {
+        *held = Some(preview);
+    }
+}
+
+/// Nothing in the hand (or nothing live): no lines this frame.
+pub fn clear() {
+    if let Ok(mut held) = PREVIEW.lock() {
+        *held = None;
+    }
+}
+
+/// The latest preview, if any.
+pub fn held() -> Option<Preview> {
+    PREVIEW.lock().ok().and_then(|held| held.clone())
+}
+
+/// One gizmo segment as the brain says it: the frame helper wraps these
+/// into the game's own `Line` values.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Seg {
+    pub start: [f64; 3],
+    pub end: [f64; 3],
+    pub color: u32,
+    pub width: f32,
+}
+
+/// A cube's wireframe around `at`: twelve edges, the impact marker.
+pub fn mark(at: [f64; 3]) -> Vec<Seg> {
+    let s = MARK_SIZE;
+    let corners = [
+        [at[0] - s, at[1] - s, at[2] - s],
+        [at[0] + s, at[1] - s, at[2] - s],
+        [at[0] - s, at[1] + s, at[2] - s],
+        [at[0] + s, at[1] + s, at[2] - s],
+        [at[0] - s, at[1] - s, at[2] + s],
+        [at[0] + s, at[1] - s, at[2] + s],
+        [at[0] - s, at[1] + s, at[2] + s],
+        [at[0] + s, at[1] + s, at[2] + s],
+    ];
+    let edges = [
+        (0, 1),
+        (1, 3),
+        (3, 2),
+        (2, 0),
+        (4, 5),
+        (5, 7),
+        (7, 6),
+        (6, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ];
+    edges
+        .iter()
+        .map(|(a, b)| Seg {
+            start: corners[*a],
+            end: corners[*b],
+            color: MARK_COLOR,
+            width: LINE_WIDTH,
+        })
+        .collect()
+}
+
+/// The flight's lines: the dashed arc (one segment every [`DASH`] steps),
+/// the ground track, and the marker.
+pub fn build_lines(preview: &Preview) -> Vec<Seg> {
+    let mut lines = Vec::with_capacity(
+        (preview.points.len() / DASH)
+            .saturating_add(preview.ground.len().saturating_sub(1))
+            .saturating_add(usize::from(preview.impact.is_some()) * 12),
+    );
+    for (i, pair) in preview.points.windows(2).enumerate() {
+        if i % DASH != 0 {
+            continue;
+        }
+        lines.push(Seg {
+            start: pair[0],
+            end: pair[1],
+            color: LINE_COLOR,
+            width: LINE_WIDTH,
+        });
+    }
+    for pair in preview.ground.windows(2) {
+        lines.push(Seg {
+            start: pair[0],
+            end: pair[1],
+            color: GROUND_COLOR,
+            width: LINE_WIDTH,
+        });
+    }
+    if let Some(at) = preview.impact {
+        lines.extend(mark(at));
+    }
+    lines
 }
 
 // ── The side profile panel ────────────────────────────────────────────────
@@ -284,13 +427,25 @@ pub fn range_label(meters: f64) -> String {
     }
 }
 
+#[derive(Default)]
+pub struct Mod;
+
+#[mod_api::horizon_mod]
+impl Hooks for Mod {
+    /// The mod registers nothing: the preview has no toggle — installing it
+    /// is asking for it, and what the hand holds decides the rest.
+    fn register(&self, _: &mut dyn Registrar, _: &RegistrationContext) {}
+
+    /// Implemented as a no-op so the game always calls the
+    /// `native_client_tick_pre` dispatch the tick mixin lives in: the game
+    /// skips dispatches no mod listens to, and the mixin must run.
+    fn client_tick_pre(&self, _: &mut dyn mod_api::ClientHost, _: &mut mod_api::ClientTickPreEvent) {
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{
-        DASH_SPACING, EYE_FRAC, PANEL_PAD, SCALE_CAP, eye_y, forward_unit, panel, profile,
-        range_label, scale_for, stroke, to_panel,
-    };
-    use super::{What, bow_power, from_item, plan};
+    use super::*;
 
     #[test]
     fn the_bow_does_not_fire_below_a_tenth_of_a_draw() {
@@ -350,6 +505,22 @@ mod tests {
     }
 
     #[test]
+    fn the_lines_are_arc_ground_and_marker() {
+        let preview = Preview {
+            points: vec![[0.0, 64.0, 0.0], [0.0, 64.0, 1.0], [0.0, 63.5, 2.0]],
+            ground: vec![[0.0, 60.0, 0.5], [0.0, 60.0, 1.5]],
+            impact: Some([0.0, 63.0, 3.0]),
+        };
+        let lines = build_lines(&preview);
+        // One dashed arc segment (the second window skips on the dash), one
+        // ground segment, and the impact marker's twelve edges.
+        assert_eq!(lines.len(), 1 + 1 + 12);
+        assert_eq!(lines[0].color, LINE_COLOR);
+        assert_eq!(lines[1].color, GROUND_COLOR);
+        assert_eq!(lines[2].color, MARK_COLOR);
+    }
+
+    #[test]
     fn the_panel_sits_right_of_the_crosshair() {
         let p = panel(426.67, 240.0);
         assert!(p.x0 > 213.0, "right of the crosshair");
@@ -390,10 +561,7 @@ mod tests {
         let p = panel(426.67, 240.0);
         let at = to_panel(&p, 2.0, [10.0, 3.0]);
         assert!((at[0] - (p.x0 + PANEL_PAD + 20.0)).abs() < 0.01, "{at:?}");
-        assert!(
-            (at[1] - (p.y0 + EYE_FRAC * p.h - 6.0)).abs() < 0.01,
-            "{at:?}"
-        );
+        assert!((at[1] - (p.y0 + EYE_FRAC * p.h - 6.0)).abs() < 0.01, "{at:?}");
         assert!((eye_y(&p) - (p.y0 + EYE_FRAC * p.h)).abs() < 0.01);
     }
 

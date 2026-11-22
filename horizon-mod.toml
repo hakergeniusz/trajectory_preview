@@ -1,0 +1,51 @@
+id = "trajectory_preview"
+name = "Trajectory Preview"
+version = "0.4.0"
+description = "Draws where the projectile in hand will land, with the game's own physics: the arc and ground track in the world, a side-profile panel by the crosshair."
+authors = ["hakergeniusz"]
+license = "MIT"
+api = "0.2"
+side = "client"
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "f037744a79f9982c47876f49c5a3067279f88706"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
+
+# Every tick, on the window's game only: simulate the projectile in hand and
+# publish its flight for the frame injection to draw. The client_tick_pre
+# hook itself is implemented in src/lib.rs so this dispatch always runs.
+[[native.mixin]]
+id = "tick"
+target = "horizon_client::game::native_hooks::client_tick_pre::Game<'_>::native_client_tick_pre"
+kind = "HEAD"
+helper = "src/mixins/tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# Every rendered frame: the published flight joins the depth-tested gizmo
+# lines.
+[[native.mixin]]
+id = "frame"
+target = "horizon_client::game::native_visuals::Game<'_>::native_frame_visuals"
+kind = "HEAD"
+helper = "src/mixins/frame.rs"
+bindings = [
+  { name = "lines", ty = "&mut Vec<horizon_client::gizmos::Line>", value = "lines" },
+]
+
+# Every HUD pass, after the crosshair's own layer: the flight's side profile
+# panel right of the crosshair — length across, drop down, readable at every
+# aim angle.
+[[native.mixin]]
+id = "hud"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_gui_layer_post"
+kind = "HEAD"
+helper = "src/mixins/hud.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "layer", ty = "&str", value = "layer" },
+  { name = "draw", ty = "&mut HudBatch", value = "&mut *draw" },
+]
